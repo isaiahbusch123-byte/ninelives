@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NINE LIVES — Sprite Preview Room</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Press+Start+2P&display=swap');
+  :root{ --paper:#FFF8EC; --ink:#241B3A; --pink:#FF6FA0; --blue:#4FC3E8; --yellow:#FFD23F; --green:#5BC97F; --red:#E8556F;
+         --display:'Fredoka',sans-serif; --pixel:'Press Start 2P',monospace; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:linear-gradient(180deg,#EFE3D0 0%,#D9C2A2 50%,#B99972 100%);background-attachment:fixed;
+       font-family:var(--display);color:var(--ink);padding:20px clamp(12px,3vw,40px) 70px;}
+  .wrap{max-width:1000px;margin:0 auto;}
+  h1{font-family:var(--pixel);font-size:clamp(11px,2.2vw,17px);margin-bottom:6px;}
+  .sub{font-size:14px;font-weight:600;opacity:0.72;margin-bottom:20px;}
+  .card{background:var(--paper);border:3px solid var(--ink);border-radius:14px;box-shadow:6px 6px 0 var(--ink);padding:16px;margin-bottom:20px;}
+  .stagewrap{position:relative;aspect-ratio:1/1;max-width:760px;margin:0 auto;border:4px solid var(--ink);
+       border-radius:12px;box-shadow:6px 6px 0 var(--ink);overflow:hidden;background:#EFE3D0;}
+  canvas#stage{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;}
+  .tag{position:absolute;transform:translate(-50%,-100%);font-family:var(--pixel);font-size:7px;
+       background:var(--paper);border:2px solid var(--ink);border-radius:5px;padding:4px 6px;white-space:nowrap;
+       pointer-events:none;line-height:1.6;}
+  .tag.queued{background:var(--yellow);} .tag.live{background:var(--green);}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;justify-content:center;}
+  button{font-family:var(--pixel);font-size:7px;padding:10px 12px;border:2.5px solid var(--ink);border-radius:8px;
+       background:var(--yellow);box-shadow:3px 3px 0 var(--ink);cursor:pointer;}
+  button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink);}
+  button.ghost{background:#fff;} button.on{background:var(--blue);}
+  .drop{border:3px dashed var(--ink);border-radius:12px;padding:18px;text-align:center;background:#FFFDF7;cursor:pointer;margin-top:14px;}
+  .drop.over{background:var(--blue);}
+  .drop p{font-family:var(--pixel);font-size:8px;line-height:1.9;}
+  .drop small{display:block;font-weight:600;font-size:13px;opacity:0.65;margin-top:6px;}
+  .legend{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px;}
+  .lg{font-family:var(--pixel);font-size:6px;border:2px solid var(--ink);border-radius:5px;padding:5px 8px;}
+  .status{font-family:var(--pixel);font-size:7px;padding:10px;border-radius:6px;margin-top:12px;display:none;line-height:1.8;}
+  .status.show{display:block;} .status.ok{background:#D8F5E3;border:2px solid var(--green);}
+  .status.err{background:#FBDDE3;border:2px solid var(--red);}
+  .note{font-size:13px;font-weight:600;opacity:0.75;line-height:1.5;margin-top:10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SPRITE PREVIEW ROOM</h1>
+  <p class="sub">Every cat in the queue — released and upcoming — walking around so you can check sprites and animations before they go live.</p>
+
+  <div class="card">
+    <div class="stagewrap" id="stagewrap">
+      <canvas id="stage"></canvas>
+    </div>
+    <div class="bar">
+      <button class="ghost" data-force="">FREE ROAM</button>
+      <button class="ghost" data-force="sit">ALL SIT</button>
+      <button class="ghost" data-force="walk">ALL WALK</button>
+      <button class="ghost" data-force="sleep">ALL SLEEP</button>
+      <button class="ghost" data-force="play">ALL PLAY</button>
+      <button class="ghost" id="btnAura">AURA: REAL</button>
+      <button class="ghost" id="btnLabels">LABELS: ON</button>
+    </div>
+    <div class="legend">
+      <span class="lg" style="background:var(--green)">LIVE = ALREADY RELEASED</span>
+      <span class="lg" style="background:var(--yellow)">QUEUED = NOT LIVE YET</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h1 style="font-size:10px;margin-bottom:10px;">TEST A SPRITE PACK</h1>
+    <div class="drop" id="dropZone">
+      <p>DROP A PACK HERE TO TEST IT</p>
+      <small>Previews instantly. Nothing is saved or published from this page.</small>
+      <input type="file" id="packFile" accept=".json,application/json" multiple style="display:none;">
+    </div>
+    <div class="status" id="status"></div>
+    <p class="note">Dropped packs are added as extra cats in the room above so you can watch them move. To keep one, load it in the admin page instead.</p>
+  </div>
+</div>
+
+<script>
+const SLEEP_EX = [
+  "..01........20...............",
+  ".0161......2070..............",
+  ".01661....20770..............",
+  ".01066100000770022...........",
+  ".0100600111107002300222......",
+  ".016001111111102200022002....",
+  ".0001111111311020002200002...",
+  "000111222133322000021100022..",
+  ".041120002332004200111100202.",
+  "0014433003333042220111102010.",
+  ".0543433336003444244111020102",
+  "..444333533635422444411201102",
+  "...53443355454242443342011102",
+  "....4..444444002553333011102.",
+  ".......34340000.55533111102..",
+];
+const SKINS = {"shadow":{"label":"Shadow (black)","sitRows":["...2......2..........","..000....002.........","..2300..00002........","..03002000302........","..00000003302........","..00000000302........","..03000300002........",".2021002100002.......",".20233321000002..22..","21331033333102..0330.",".211030313102...01332","..213333100002...2002","...200311000002..2002","..2013330000002..2002","...2000030000002.2002","...20133310000002002.","...20013332000002002.","....200130200000002..","....20213201000002...","....2121121331022....",".....2222222222......"],"sitColors":["#282425","#585152","#010000","#685758"],"sleepColors":["#585152","#8a8586","#282425","#aca3a3","#867f7f","#645f5f","#e58ba8","#955a6d"],"walkPal":{"O":"#010000","B":"#585152","H":"#878282","S":"#2c2829","W":"#aca3a3","P":"#e58ba8","N":"#e58ba8","E":"#010000","K":"#a67181"}},"smoke":{"label":"Smoke (grey tabby)","sitRows":["...0......0..........","..010....020.........","..0310..02120........","..03100001310........","..01010103310........","..02121212310........","..03222322110........",".0245224522110.......",".02433345211110..00..","45335233333510..0330.",".453232333504...05330","..453333500214...0110","...402355211004..0210","..4253332122114..0120","...4222232211004.0210","...42533351112104124.","...40253330012214114.","....402532022110014..","....42453015221104...","....4545505335144....",".....4444444444......"],"sitColors":["#312a29","#635353","#8a7575","#eac8c9","#020100","#b69a9c"],"sleepColors":["#635353","#928787","#483c3c","#a9a0a0","#8f8686","#776e6e","#8a7575","#5a4c4c"],"walkPal":{"O":"#312a29","B":"#635353","H":"#8f8383","S":"#4a3e3e","W":"#a9a0a0","P":"#8a7575","N":"#8a7575","E":"#312a29","K":"#786666"}},"ginger":{"label":"Ginger (orange)","sitRows":["...1......1..........","..131....101.........","..1031..10301........","..14111133031........","..11033334431........","..10303000431........","..10040000331........",".1024442000331.......",".10244420033331..11..","20004044004031..1441.",".204040444012...14442","..204444411032...1342","...220400003112..1032","...244444000032..1002","...2004440000112.1002","....1444400300312302.","....1144441300032332.","....201444100033132..","....20204130000312...","....2020410440322....",".....2222222222......"],"sitColors":["#fdc8ad","#6f2805","#020102","#fb8b4d","#fbe1d0"],"sleepColors":["#fb8b4d","#fcae82","#723f24","#fdc8ad","#c69c87","#947465","#e58ba8","#955a6d"],"walkPal":{"O":"#020102","B":"#fb8b4d","H":"#fcab7f","S":"#7e4628","W":"#fdc8ad","P":"#e58ba8","N":"#e58ba8","E":"#020102","K":"#ef8b7f"}},"slate":{"label":"Slate (dark grey)","sitRows":["...2......0..........","..000....010.........","..2300..01010........","..03000000300........","..00000003300........","..01010101300........","..03111311000........",".0121112111000.......",".01233321100000..00..","21331133333100..0330.",".213131333102...01332","..213333100102...0002","...201311100002..0102","..2113331011002..0012","...2111131100002.0102","...21133310001002012.","...20113332011102002.","....201131211000002..","....21213201110002...","....2121121331022....",".....2222222222......"],"sitColors":["#333131","#585454","#010101","#837a7b"],"sleepColors":["#585454","#8a8787","#282626","#bbb6b6","#928e8e","#6d6a6a","#e58ba8","#955a6d"],"walkPal":{"O":"#010101","B":"#585454","H":"#878484","S":"#2c2a2a","W":"#bbb6b6","P":"#e58ba8","N":"#e58ba8","E":"#010101","K":"#a67282"}},"ash":{"label":"Ash (grey)","sitRows":["...0......0..........","..000....210.........","..0500..01010........","..03000000500........","..00000103300........","..01010101300........","..04111411000........",".0121112111100.......",".01233321100100..20..","21551133553100..0330.",".213131333102...01332","..213333100142...0002","...201311100552..0102","..2113331011002..0012","...2111131100002.0102","...21133310001102012.","...20113332001102002.","....201131211000002..","....21213201110002...","....2121121331022....",".....2222222222......"],"sitColors":["#343131","#585354","#010101","#837b7b","#de8e54","#a36b44"],"sleepColors":["#585354","#8a8787","#282626","#bbb6b6","#928e8e","#6d6a6a","#e58ba8","#955a6d"],"walkPal":{"O":"#010101","B":"#585354","H":"#878384","S":"#2c2a2a","W":"#bbb6b6","P":"#e58ba8","N":"#e58ba8","E":"#010101","K":"#a67282"}},"midnight":{"label":"Midnight (jet black)","sitRows":["...0......0..........","..000....000.........","..0200..00000........","..01000000200........","..00000001100........","..00000000100........","..01000100000........",".0001000100000.......",".00011101000000..00..","01221011221100..0000.",".011010111100...01000","..011111100000...0000","...000111000000..0000","..0011110000000..0000","...0000010000000.0000","...00111110000000000.","...00011110000000000.","....000110000000000..","....00011001000000...","....0101101111000....",".....0000000000......"],"sitColors":["#0b0b0b","#2f2f2f","#814f52"],"sleepColors":["#2f2f2f","#6d6d6d","#1b1b1b","#8d8d8d","#707070","#565656","#814f52","#543335"],"walkPal":{"O":"#0b0b0b","B":"#2f2f2f","H":"#696969","S":"#1d1d1d","W":"#8d8d8d","P":"#814f52","N":"#814f52","E":"#0b0b0b","K":"#5c4142"}},"silver":{"label":"Silver (light grey)","sitRows":["...0......0..........","..010....020.........","..0510..02120........","..03100001510........","..01010103310........","..02121212310........","..03222322110........",".0245224522110.......",".02433345211110..00..","45555233553510..0330.",".453232333504...05330","..453333500214...0110","...402355211004..0210","..4253332122114..0120","...4222232211004.0210","...42533351112104124.","...40253330012214114.","....402532022110014..","....42453015221104...","....4545505335144....",".....4444444444......"],"sitColors":["#353233","#6c6868","#989393","#fefdfd","#010000","#d0bcbe"],"sleepColors":["#989393","#b7b3b3","#625e5e","#fefdfd","#d2d0d1","#aaa8a8","#d0bcbe","#877a7c"],"walkPal":{"O":"#353233","B":"#989393","H":"#b5b1b1","S":"#666263","W":"#fefdfd","P":"#d0bcbe","N":"#d0bcbe","E":"#353233","K":"#b7aaab"}},"cocoa":{"label":"Cocoa (brown)","sitRows":["...0......0..........","..000....020.........","..0100..02020........","..01000000100........","..00000001100........","..02020202100........","..01222122000........",".0202220222000.......",".02011102200000..00..","02112011111200..0110.",".021010111200...02110","..021111200200...0000","...002122200000..0200","..0221112022000..0020","...0222212200000.0200","...02211120002000020.","...00221110002200000.","....002212022000000..","....02021002220000...","....0202202112000....",".....0000000000......"],"sitColors":["#2a1304","#8e5029","#622e09"],"sleepColors":["#622e09","#916d53","#431f06","#c19f89","#a0806c","#826451","#e58ba8","#955a6d"],"walkPal":{"O":"#2a1304","B":"#622e09","H":"#8e694e","S":"#462006","W":"#c19f89","P":"#e58ba8","N":"#e58ba8","E":"#2a1304","K":"#aa6160"}}};
+const IDX = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const WALK_A = [
+".................OHO..OBO.",
+"..OO.............OPOOOOPO.",
+".OHHO............OPPBBPPO.",
+"OHHO........O...OBBBBBBBBO",
+"OHHO....OOOOHOOOOBBBBBBBBO",
+".OHHO.OOHHHBBBBBBBBBBEBBBO",
+".OHHOOHHHBBBBBBBBBBBBBWWNO",
+"..OHHOBBBBBBBBBBBBBBKBWWWO",
+"...OOBBBBBBBBBBBBBBBBSSSO.",
+".....OBBBBBBBBBBBBBOSSOO..",
+".....OBBBBBBBBBBBSSOOO....",
+"......OBBBBBBBSBBOBBO.....",
+"......OBBOBBSOOBBOBBO.....",
+"......OBBOBBO.OBBOBBO.....",
+"......OBBOBBO.OBBOBBO.....",
+".......OO.OO...OO.OO......"
+];
+const WALK_B = [
+".................OHO..OBO.",
+"..OO.............OPOOOOPO.",
+".OHHO............OPPBBPPO.",
+"OHHO........O...OBBBBBBBBO",
+"OHHO....OOOOHOOOOBBBBBBBBO",
+".OHHO.OOHHHBBBBBBBBBBEBBBO",
+".OHHOOHHHBBBBBBBBBBBBBWWNO",
+"..OHHOBBBBBBBBBBBBBBKBWWWO",
+"...OOBBBBBBBBBBBBBBBBSSSO.",
+".....OBBBBBBBBBBBBBOSSOO..",
+".....OBBBBBBBBBBBSSOOO....",
+".....OBBBBBBBBBBSOOBBO....",
+".....OBBOOOBBOBBO.OBBO....",
+".....OBBO.OBBOBBO.OBBO....",
+"......OO..OBBOOO..OBBO....",
+"...........OO......OO....."
+];
+const YARN_A = [
+"...OOOO...",
+"..OBBHBO..",
+".OBSBBSBO.",
+"OBBSBSBHSO",
+"OBSBBSBBBO",
+"OHBSBBSBBO",
+"OBSBBSBBSO",
+".OBBSBSBO.",
+"..OBSBHO..",
+"...OOOO..."
+];
+const YARN_B = [
+"...OOOO...",
+"..OBSBBO..",
+".OHBSBBSO.",
+"OBSBBSBBBO",
+"OBBSBBSBHO",
+"OBSBBSBBBO",
+"OHBSBBSBBO",
+".OBSBBSBO.",
+"..OBBSBO..",
+"...OOOO..."
+];
+const YARN_PAL = { O:"#8E1F3E", B:"#E8567F", S:"#C8355C", H:"#F58BA8" };
+const CROWN_SIT = [[6,2],[7,2],[8,2],[9,2],[10,2],[6,1],[8,1],[10,1],[8,0]];
+const ROOM_PAL = ["#eac9a0", "#c28050", "#41120c", "#8b4e2a", "#5e2f16", "#9f603c", "#9d480f", "#4d282d", "#bf6117", "#73451f", "#6b3038", "#80340a", "#b66d43", "#5f2103", "#fdddbd", "#a14b10", "#75547d", "#cba791", "#883c4c", "#945c47", "#fbe7d7", "#856f23", "#cc8a1a", "#eeb77d", "#95862f", "#edad1a", "#714b4c", "#866266", "#6b2a36", "#bd8c6f", "#ad9a57", "#d6a673", "#300701", "#8a713c", "#997a9a", "#cbb6b1", "#d99916", "#5d4726", "#cd7e05", "#ac6202", "#a07862", "#734aa4", "#7e4c3c", "#ab6026", "#3a1a22", "#d37835", "#7a691e", "#6f1e04", "#cf952a", "#5f3849", "#feece5", "#d98e4d", "#af6d57"];
+const ROOM = [
+"v43340000277772000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+"v0d33d000277772000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+"v00433d00277772000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+"v000d3340277772000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+"v0004433d277772000000000000000w22222222200000000000000000000000000000000000000000000000000000000000000000000000",
+"v0004Gd3327777200000000000000wQ55555555cw0000000000000000000000000000000000000000000000000000000000000000000000",
+"d22443443277772000000000000002H22222222H20000000000000000000000000000000000000000000000000000000000000000000000",
+"411143414277772000000000000002H2BggFggI920000000000000000000000000000000000000000000000000000000000000000000000",
+"41114341127777200000000000000I9IggF5jgI920000000000000000000000000000000000000000000000000000000000000000000000",
+"41114341127777200000000000000292gqgl5gI920000000000000000000000000000000000000000000000000000000000000000000000",
+"41114341127777200000000000000292F9B9gFI92000000000000000000000000000000000000000000000000www0000000000000000000",
+"41114341127777220000000000000292F9B9BG29200000000000000000000000000000000000000000000000wuow0000000000000000000",
+"4111434112777723d00000000000029IgB9999I9I0000000000000000000000000000000000000000000000wuoK20000000000000000000",
+"41114341127777233400000000000292G9B999I9I000000000000000000000000000000000000000000000w4oKw00000000000000000000",
+"411143411277772433d0000000000292B9999929I00022222222222222000000000000000000000000000wx4dw000000000000000000000",
+"41114341127777214334000000000292I22222I32002HHHHHHHHHHHH5H2000000000000000000000000w244do4w20000000022200000000",
+"41114341127777211433d00000000299999999992002H2222222222225I000000000000000000000000wuuu4o4xw00000002KG200000000",
+"411143411277772114433400000000222IIIIII2000252sssasssssaI9200000000000000000000000002KKKo444w002222KKK200000000",
+"41111441127777211d043340000000000000000000029Issas7ssssaI9200000000000000000000000000w44o4uo2002GG4B4B200000000",
+"41111111127777211400d3340000000000000000000I9Iasa77ssas7I9200000000000000000000000000024o4ol202IB44BBII2III2000",
+"4399999332777721140044334000000000000000000I92s7777a777II9200000000000000000000000000wl4K7w202jj244B2j5j555j200",
+"4j555555j2777721140043433400000000000000000I92777777777II9200000000000000002000000000024o2000Ij5I7444255555j200",
+"444444444w7777211442434433d0000000000000000I92IIIIIIIIIIIG20000000000000002xw0000000000wo200025522222I55555j200",
+"499999994277772114t1434t4332000000000000000I99999999999999200000000000002w2B222000000ww4K4w00I22Ijjjj2222222200",
+"4999999342777721141143411433d000000000000000222222222222220000000000000wxxxuuxx20000w99dl4Bw0Ijj299992jjjjjj200",
+"43333393427777211411434114433d00000000000000000000000000000000000000w0wxBBBBBB4x2we0229949w2025552222j555555200",
+"433333934277772114114341140433d00000000000000000000000000000000000w2xwIloxlluullIxwwwaw222G2wI555jjjj555555j2w0",
+"4333339342777721141143411400d33d000000000000000000000000000000000w1129Ill99999ll2BI1twGGG9wt12j555555555555j2tw",
+"43333393427777239411434114002433d0000000000000000000000000000000021112I99999999lIB41294444G21244444444444444212",
+"433333934277772jj41143411400d3433d00000000000000000000000000000002112II22IB9999B221129GGGG9212GGGGGGGGGG99G9I12",
+"4333339342777724411143411424434433d0000000000000000000000000000002129bbbb2B999B21t1129GGG99212G3333333333939212",
+"43333393327777294111434114114341d33d0000000000000000000000000000021Ibbbbb222222t1111t299992t12G3333333333G4G212",
+"4333333992777723411143411411434114334000000000000000000000000000021IbbbbbIt1111111111j2222j112339333GGG4G44G212",
+"4333333332777723411143411411434114433d00000000000000000000000000021Ibbbbb211111111111111111112GGG9993333G999212",
+"43333333327777234111t4411411434114043340000000000000000000000000021II2222I11111111111111111111222222222I2222112",
+"4333333332777723411111111411434112004334000000000000000000000000021Izzzzz21111111111111111111111111111111111112",
+"4333333332777723493333G33411434112004433d00000000000000000000000023GIIIII23333333333333333333333333333333333332",
+"4333333332777723455555555411434112004343340000000000000000000000025555555j5555555555555555555555555555555555552",
+"4333333332777723444444444111434114444344334000000000000000000000022222222222222222222w222222222w222222222222222",
+"4333333332777723399999994111434114114341433d00000000000000000000002G242B4242424292222422242a272B272422227272G20",
+"4333333332777723999999934111434114114341143340000000000000000000002524299232B292G2442324242G2N292424444442a2j20",
+"43333333327777233333339341114341141143411443340000000000000000000025242992429292G2aa292424232N292424444442a2j20",
+"4333333332777723333333934111144114114341140d33d0000000000000000000252a299242B292G244292424232N292424444442a2j20",
+"43333333327777233333339341111111141143411400433d000000000000000000252s2992422922G244292424232722242444444222520",
+"433333333277772333333393499999999411434114004433d00000000000000000252292292jj55Q2G222292G2G2222GG2G222222292520",
+"4333333332777723333333934555555554114341140043433d0000000000000000254t11111111111111111111111111111111111114520",
+"43333333327777233333339344444444411143411422434433d0000000000000002522wwww2w2wwww2w22w2w2www2www2wwww2www2w2j20",
+"43333333327777233333339339999999411143411411434td33d00000000000000252a2B2a24272B272724242224w42242d27242B242j20",
+"4333333332777723333333399999999341114341141143411433d0000000000000252429d3242423272a2429242B24292422a2G2a242j20",
+"43333333327777233333333333333393411143411411434114433d0000000000002524292G2424292NIa2429242B242G2422a2G2a242j20",
+"43333333327777233333333333333393411114B1141143411402332000000000002524292G22242922G2242224292429G24272G2G222j20",
+"4333333332777723333333333333339341111111141143411400d33d000000000025242292G9G2Gdj5555299G2G292jG92422a29dGGI520",
+"43333333327777233333333333333393439999939411434114007433400000000002j411111111111111111111111111111111111t4j200",
+"433333333277772333333333333333934j55555554114341140043433400000000025242222222222w222222222222222222ww22ww25200",
+"4333333332777723333333333333339344444444411143411444434433d0000000025222G9999999924242BI4242927222272d2424d5200",
+"43333333327777233333333333333393399999994111434114114341433400000002j242999999999242929292929242B424242B2N25200",
+"433333333277772333333333333333399999999941114341141143411434000000025222999999999292429292924242442429dB2a25200",
+"4333333332777723333333333333333333333393411143d1141143411440000000025225555555555j222G2a222G2G222222G2G29225200",
+"4333333332777723333333333333333333333393411114411411434114000000000252t1111111111111111111111111111111111125200",
+"43333333327777233333333333333333333333934111111114114341140000000002a4444444444444444444444444444444444444I4200",
+"433333333277772333333333333333333333339349333333341143411400000000025555555555555555555555555555555555555555200",
+"43333333327777233333333333333333333333934j55555554114341149999bbbb92j444444444444444444444444444444444444445299",
+"43333333327777w33333333333333333333333934444444441114341143HH3333f3254t11111111Q411111111111111411111111114523H",
+"43wwwww22I77772wwwww223333333wwwwwwww2w22299999w2www2w2222ww44444Ld2545555d4555j45555554455555545555945555452d4",
+"4w399939327777IG9399G923333wwH888888888HHH2wG2wH88888888888H22111112j455555555554555555555555554555555555545211",
+"72999996332II7G999969923332H888888888888888H2H888888888888888H2111125455555555554555555555555554555555555545211",
+"42999999999393999999992332H88bb666bbbbbb6688488b6666bbbbbbb688H211125444444444444444444444444444444444444445211",
+"42444444444444444444442332H6666fff66666666666b6666ff66666666668211125555555555555555555555555555555555j2222j211",
+"724444444444444444444423wHbfffffffffffffffffd6fffff6fffffffff6bH211222222222222222222222222222222222222aaas2211",
+"4G22222222222222222222332666ffffffffffffffff6fffffffffffffffff66211112GG2jjjjjjjjjjjjj333333jjjjj333GIassssa211",
+"432IIIIIII77IIII7IIII2332ffff6ffffffff6ffff6bfffffffffffffffffff2cccc122G3333333333333333333333333333IIssssII1c",
+"4327777IIIIII442I77772332ffffffffffffffffff66fffffffffffffffffff21111111111111111111111c11111111111112iIIIIi211",
+"432777I77744c944777772332ffffffffffffffffff6bfffffffffffffffffff21111111111111111111111c111111111111t12iiii2Ec1",
+"43277II77499pmm947I7723326ffff6ddd6fffffffffbfffffffff666666fff621111111111111111111111c1111111111222IIssss2Q11",
+"43277I7749J6pCpm447472332bf6Ldd666Lffffffffffffff66ffdddddddd66b21111111111111111111111c11111111126662issssi211",
+"4327777499pDpCp6944a72224dbd6666666d6f6ffff6bfffffffdnnnnnnnndbd422c1111111111111111111c11111111d36b2iiiiiiii21",
+"43277744c6pACCAMb44a42H888dd666666bd6f6ffff6dffff622IIInnnnnntL888821111111111111111111c1111111126bb2siiiiiisI1",
+"43277449mHApCDCp694a2H88888d6666bbbbd66ffff6Lfff62jj55522222I4H8888H2111111111111111111c111111112bb42assssssa21",
+"44w77449mDmADDApm9La2888888dbbbbbbbbdLddddddbddddI55555555j5jd8888882111cccc1111cccccccc111ccccc2bL292ssssss2G2",
+"22I774496pCDfmDAm9La2888888dbbbbbbbbdH8888888888825555555555528888882111c11111111111111111111111122392sssssa239",
+"2aI77449bMAf8D666b4a2866668dbbbbbbbdb888888888888I5555555555528666b82111c111111111111111111111111129332ssss2339",
+"2qI74442222m66bb394a26ffff6dbbbddLd9H888888888888I555555555552bfff6L2111c111111111111111111111111123w2322229969",
+"2222d2Igggg2wHf6b94a2f6fff64ddLbH8888888888888888I44444555555I6fff662c11c11111111111111111111111112wNN233339699",
+"2933p4rG3EGgI236434426fff66d8888888888888888888882G9333444444I6fffff2111c11111111111c111111c11111122NNaw3699994",
+"2936p42cc5cI2924jj9Bawffff6d888888888888888888888H24444333G3G26ffff62111c111111111111111111111111122NNae2999bb9",
+"2936d2y2222y2jIjGGGqq26fff6d8888888888888888888882GGGGG44443G26fff62t111c11111111111111111111111111wNNIe2444992",
+"29922IgyyyygII42222222ffff6db68888888888888888888H2I22299999G2ffff6211c1ccc1111ccccc1cccccccccccc112N7Ie2299dd2",
+"232OIkIgggggIjj5jjjjj26ffffd66bbbbbbbbbbbbbbbbbb6bb9bbb2222224ffff6211111111111111111111111111111112a7Ih2q22242",
+"292kkkIggggI2w2111111266666d6fff6ffffffffffffffff6ff666666363df6fff21111111111111111cccc122wwwwww22wa7Ih2q22292",
+"292kOOIIIIIG2421111112bbbbbdbb6ff6666666666666666ff6fff666fbb4bbbbb21111111111111111111224kkkkkkk4H2a7Ih2721w92",
+"29IkkkI999992d21111111w222w4w29bbbbbbbbbbbbbbbbbbbbbbbbbbbbw2422222t1111111111111111c2211beeeeeee48wN7Ih272J242",
+"292kkk2999692421111111124422jjw2222222222222222222222222222jj22772111111111111111111wcJ8JLeeeeeee4832aIh222cwwt",
+"29IhhhI99999222111111112a42j55jjj555555555555555555jjjjj3jj55j2BB21111111111111111112H888Leeteeee488322236HJ211",
+"2992I29399992d21111111112wjjj5jjj555j5555555555j555jjjj535jj55j2211111111111111111112Lb88beeeeeee488J666888P211",
+"2399399999992L2cccccccccc11cccccc1111c1ccc11111111cccccccccccc111cc1cccccccccccccccc266bb2eeteeee4888888888J2c1",
+"244444444444w221111111111111114444444911c1111144444444s444L1111111111111c11111111111122652eejhhhh2bbLLbbbbbL211",
+"2944444444b42t21111111111111145Q55335844s44494533555cc855119111111111111c11111111111111222hhhEhhh2366666H663211",
+"22222222224221w1112I111111111j44553358cQ5c1155533555cc8554Lj111111cc1111c11111111111111112hhjEttt22222222222111",
+"24d4444444d2tnw122ee222222Q114QQ553358cc55115553335xcc855114111c11111111c1111111111cc11112hhjjhhh2ttt2a2111Q111",
+"244444444442w222j2hh2j5555211j44553358cc55115555335xcc85544j111111111111c11111111111111112ttjEw22Qcc2q211111111",
+"2444444444b244225j22j555552114QQ553358cc5c111555335xcc85514j111111111111c11111111111111112hh22q2t112qw11111c111",
+"2444444444b24422j55j555555I11j44553358cc55511555335xcc855114111111111111c11111111111111111w2112rwQ2r21111111111",
+"24444444444244225555555555Ic14QQ553358cc55511555335xcc85544jcccccccccccccccccccccccccccc1c11c11wrwr2Q1c1ccccccc",
+"244444444442w2225555555555I11j44553358ccc5511555335xcc855114111111111111111111111111111c1111111twrwt11111c11111",
+"244444444442t1t24444444444I114Qc55335H8cc5511555335xcc8H544j111111111111111111111111111c1111111wrwr211111111111",
+"242222222242111299999GG94GI11j455533558cc5511555335xcc8551141111111111111111111111111111555555wrwj2r2j553111111",
+"242jGGjjj2421112G3333333G4211j4Q5533558cc55115553355cc855441111111111111111111111111111333j3jwr2jjj2r2j5j311111",
+"242jjjjj3w421112G3333333GG2114Qc5533558cc5511555335ccc85511411111111111111111111111111335555wq2j5jjj2q2Gj511111",
+"22j555j53Gw21112G33333393321114444444sbcc55115554444444444411111111111111111111111111113555wqwj5jj3352q2j511111",
+"511111111111111122II222II21111111111111sss4444s4j5555555j31111c111cccccc11111111c11111115jj22j55jjjj5j22j111111",
+"55555555555555555555555555555555555555555555555c55555555555555555555555555555555555555555555555555555555555HHH5",
+];
+
+/* ================= canvas ================= */
+const LW=222, LH=222;
+const off=document.createElement('canvas'); off.width=LW; off.height=LH;
+const octx=off.getContext('2d');
+const roomLayer=document.createElement('canvas'); roomLayer.width=LW; roomLayer.height=LH;
+const rctx=roomLayer.getContext('2d');
+const canvas=document.getElementById('stage');
+const ctx=canvas.getContext('2d');
+const wrap=document.getElementById('stagewrap');
+let cssScale=1;
+function resize(){
+  const r=wrap.getBoundingClientRect();
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  canvas.width=Math.round(r.width*dpr); canvas.height=Math.round(r.height*dpr);
+  cssScale=r.width/LW; ctx.imageSmoothingEnabled=false;
+}
+window.addEventListener('resize',resize); resize();
+
+function paintRoom(){
+  for(let r=0;r<ROOM.length;r++){
+    const line=ROOM[r];
+    for(let c=0;c<line.length;c++){
+      rctx.fillStyle=ROOM_PAL[IDX.indexOf(line[c])];
+      rctx.fillRect(c*2,r*2,2,2);
+    }
+  }
+}
+paintRoom();
+
+function P(x,y,c,a){ octx.globalAlpha=a===undefined?1:a; octx.fillStyle=c; octx.fillRect(Math.round(x),Math.round(y),1,1); octx.globalAlpha=1; }
+function drawSprite(rows,x0,y0,pal,flip){
+  for(let r=0;r<rows.length;r++){ const line=rows[r], w=line.length;
+    for(let c=0;c<w;c++){ const t=line[c]; if(t==='.')continue;
+      const col=flip?(w-1-c):c; const color=pal[t]; if(!color)continue;
+      octx.fillStyle=color; octx.fillRect(x0+col,y0+r,1,1); } } }
+function drawIdx(rows,x0,y0,colors,flip){
+  for(let r=0;r<rows.length;r++){ const line=rows[r], w=line.length;
+    for(let c=0;c<w;c++){ const t=line[c]; if(t==='.')continue;
+      const col=flip?(w-1-c):c; octx.fillStyle=colors[IDX.indexOf(t)];
+      octx.fillRect(x0+col,y0+r,1,1); } } }
+function spriteSize(rows){ return {w:rows[0].length,h:rows.length}; }
+
+function resolveSprite(skinKey,state,frameT){
+  const s=SKINS[skinKey]||SKINS[Object.keys(SKINS)[0]];
+  if(state==="walk"){
+    if(s.walkFrames&&s.walkFrames.length){ const f=s.walkFrames[Math.floor(frameT/170)%s.walkFrames.length];
+      return {rows:f.rows,colors:f.colors||s.sitColors,indexed:true}; }
+    return {rows:(Math.floor(frameT/170)%2===0)?WALK_A:WALK_B,colors:s.walkPal,indexed:false};
+  }
+  if(state==="sleep"){
+    if(s.sleepFrames&&s.sleepFrames.length){ const f=s.sleepFrames[Math.floor(frameT/400)%s.sleepFrames.length];
+      return {rows:f.rows,colors:f.colors||s.sleepColors,indexed:true}; }
+    if(s.sleepRows) return {rows:s.sleepRows,colors:s.sleepColors,indexed:true};
+    return {rows:SLEEP_EX,colors:s.sleepColors,indexed:true};
+  }
+  if(s.sitFrames&&s.sitFrames.length){ const f=s.sitFrames[Math.floor(frameT/200)%s.sitFrames.length];
+    return {rows:f.rows,colors:f.colors||s.sitColors,indexed:true}; }
+  return {rows:s.sitRows,colors:s.sitColors,indexed:true};
+}
+function drawOverlay(skinKey,state,x0,y0,flip,baseW,tMs){
+  const s=SKINS[skinKey]; if(!s||!s.overlay)return;
+  const set=s.overlay[state]||s.overlay.sit; if(!set||!set.length)return;
+  const fps=s.overlay.fps||8;
+  const f=set[Math.floor(tMs/(1000/fps))%set.length]; if(!f||!f.rows)return;
+  const ow=f.rows[0].length, dx=f.dx||0, dy=f.dy||0;
+  const ox=flip? x0+(baseW-ow-dx) : x0+dx;
+  drawIdx(f.rows,ox,y0+dy,f.colors||s.sitColors,flip);
+}
+
+/* ================= aura ================= */
+const AURA_PALS={1:["#FFE47A","#FFC93D","#F5A623"],2:["#FFE0A0","#FF9A3D","#F5602C"],3:["#FFFFFF","#9BE8FF","#4FC3E8"]};
+function auraTierFor(m){ return m>=100000?3:(m>=50000?2:(m>=10000?1:0)); }
+const maskCache=new Map();
+function getAuraMask(rows){
+  if(maskCache.has(rows))return maskCache.get(rows);
+  const h=rows.length,w=rows[0].length,PD=4;
+  const dist=Array.from({length:h+PD*2},()=>new Array(w+PD*2).fill(99));
+  for(let r=0;r<h;r++)for(let c=0;c<w;c++) if(rows[r][c]!=='.') dist[r+PD][c+PD]=0;
+  for(let pass=0;pass<3;pass++)
+    for(let r=0;r<h+PD*2;r++)for(let c=0;c<w+PD*2;c++)
+      if(dist[r][c]===pass)
+        for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+          const nr=r+dy,nc=c+dx;
+          if(nr>=0&&nr<h+PD*2&&nc>=0&&nc<w+PD*2&&dist[nr][nc]>pass+1) dist[nr][nc]=pass+1; }
+  const rings=[[],[],[]], top={};
+  for(let r=0;r<h+PD*2;r++)for(let c=0;c<w+PD*2;c++){
+    const d=dist[r][c]; if(d>=1&&d<=3) rings[d-1].push([c-PD,r-PD]); }
+  for(let c=0;c<w+PD*2;c++) for(let r=0;r<h+PD*2;r++) if(dist[r][c]<=1){ top[c-PD]=r-PD; break; }
+  const m={rings,top,w,h}; maskCache.set(rows,m); return m;
+}
+const embers=[];
+function drawAura(rows,x0,y0,flip,tier,t,seed){
+  const m=getAuraMask(rows), pal=AURA_PALS[tier];
+  for(let ri=0;ri<tier;ri++){
+    const color=pal[Math.min(ri,2)], alpha=0.9-ri*0.26, cells=m.rings[ri];
+    for(let i=0;i<cells.length;i++){
+      const cx=cells[i][0],cy=cells[i][1];
+      const fl=Math.sin(t*10+cx*1.3+cy*0.9+seed*3)+Math.sin(t*16-cx*2.1+seed);
+      if(fl<-0.7)continue;
+      P(flip?x0+(m.w-1-cx):x0+cx, y0+cy, color, alpha);
+    }
+  }
+  const maxT=1+tier*2;
+  for(const cs in m.top){
+    const c=Number(cs);
+    const n=0.35+0.65*(0.5+0.5*Math.sin(t*7+c*1.7+seed*5));
+    const ht=Math.round(maxT*n), topY=m.top[cs];
+    for(let k=1;k<=ht;k++){
+      const frac=k/maxT;
+      P(flip?x0+(m.w-1-c):x0+c, y0+topY-k, frac<0.4?pal[0]:(frac<0.75?pal[1]:pal[2]), 0.85-frac*0.4);
+    }
+  }
+  if(tier>=3&&Math.random()<0.4) embers.push({x:x0+Math.random()*m.w,y:y0+2,vy:-(7+Math.random()*9),life:1});
+}
+function stepEmbers(dt){
+  for(let i=embers.length-1;i>=0;i--){ const e=embers[i];
+    e.y+=e.vy*dt/1000; e.life-=dt/900;
+    if(e.life<=0){embers.splice(i,1);continue;}
+    P(e.x,e.y,"#BFF0FF",Math.max(0,e.life)*0.9); }
+}
+const zzz=[];
+const Z_SMALL=["XXX","..X",".X.","X..","XXX"], Z_BIG=["XXXX","...X","..X.",".X..","X...","XXXX"];
+function stepZzz(dt){
+  for(let i=zzz.length-1;i>=0;i--){ const z=zzz[i];
+    z.y-=dt/450; z.x+=Math.sin(z.y*0.4)*0.08; z.life-=dt/2600;
+    if(z.life<=0){zzz.splice(i,1);continue;}
+    const g=z.big?Z_BIG:Z_SMALL;
+    for(let r=0;r<g.length;r++)for(let c=0;c<g[r].length;c++)
+      if(g[r][c]==='X') P(z.x+c,z.y+r,"#241B3A",Math.max(0,z.life)*0.85); }
+}
+function drawFire(t){
+  const X0=9,X1=38,BASE=163;
+  octx.fillStyle="#2b0a03"; octx.fillRect(8,142,32,22);
+  const cx=(X0+X1)/2, half=(X1-X0)/2;
+  for(let x=X0;x<=X1;x++){
+    const rel=(x-cx)/half, bell=Math.max(0,1-rel*rel);
+    const n=0.55+0.26*Math.sin(t*10+x*1.4)+0.17*Math.sin(t*17-x*2.3+1.7);
+    let h=Math.round(19*bell*n); if(h<=0)continue;
+    for(let k=0;k<h;k++){ const frac=k/19;
+      const core=Math.max(0,1-Math.abs(rel)*1.4-frac*0.9);
+      P(x,BASE-k, core>0.45?"#fff3c4":(frac<0.30?"#ffdf7e":(frac<0.62?"#ffb13d":"#e8681f"))); } }
+}
+
+/* ================= actors ================= */
+const STATE_W=[["sit",0.35],["walk",0.30],["sleep",0.15],["play",0.20]];
+const STATE_DUR={sit:[2600,5200],walk:[2200,4200],sleep:[7000,13000],play:[4000,7000]};
+function pickState(){ const r=Math.random(); let a=0; for(const [s,w] of STATE_W){a+=w; if(r<=a)return s;} return "sit"; }
+function dur(s){ const [a,b]=STATE_DUR[s]; return a+Math.random()*(b-a); }
+const ROWS=[176,196,216];
+function rowBounds(gy){ return gy===176?[52,146]:(gy===196?[30,150]:[24,160]); }
+
+let actors=[], forced="", auraMode="real", showLabels=true;
+const tagHost=document.getElementById('stagewrap');
+
+function buildActors(list){
+  document.querySelectorAll('.tag').forEach(t=>t.remove());
+  actors=list.map((c,i)=>{
+    const gy=ROWS[i%3];
+    const [b0,b1]=rowBounds(gy);
+    const per=Math.max(1,Math.ceil(list.length/3));
+    const slot=Math.floor(i/3);
+    const homeX=b0+10+(slot/Math.max(1,per-1||1))*(b1-b0-20);
+    const tag=document.createElement('div');
+    tag.className='tag '+(c.released?'live':'queued');
+    tag.textContent=(c.ticker||c.name||'?');
+    tagHost.appendChild(tag);
+    return {c,i,homeX,x:homeX,groundY:gy,facing:Math.random()<0.5?1:-1,
+      state:"sit",stateUntil:performance.now()+dur("sit")+i*400,walkTarget:homeX,
+      frameT:0,zzzAt:0,yarnPhase:Math.random()*Math.PI*2,seed:i*3.7+1,tag,hit:{}};
+  });
+}
+
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(50,now-last); last=now; const t=now/1000;
+  octx.clearRect(0,0,LW,LH); octx.drawImage(roomLayer,0,0); drawFire(t);
+
+  actors.forEach(a=>{
+    if(forced){ if(a.state!==forced){ a.state=forced; a.frameT=0;
+        if(forced==="walk"){ const [b0,b1]=rowBounds(a.groundY);
+          a.walkTarget = a.x<(b0+b1)/2 ? b1-6 : b0+6; } } }
+    else if(now>a.stateUntil){
+      let n=pickState(); if(n===a.state) n=(a.state==="sit")?"walk":"sit";
+      a.state=n; a.stateUntil=now+dur(n);
+      if(n==="walk"){ const [b0,b1]=rowBounds(a.groundY);
+        a.walkTarget=Math.max(b0,Math.min(b1,a.homeX+(Math.random()-0.5)*70)); }
+      if(n==="sleep") a.zzzAt=now+600;
+    }
+    if(a.state==="walk"){
+      const d=a.walkTarget-a.x;
+      if(Math.abs(d)>0.6){ a.facing=d>0?1:-1; a.x+=Math.sign(d)*0.020*dt; a.frameT+=dt; }
+      else if(forced==="walk"){ const [b0,b1]=rowBounds(a.groundY);
+        a.walkTarget = a.walkTarget>(b0+b1)/2 ? b0+6 : b1-6; }
+      else { a.state="sit"; a.stateUntil=now+dur("sit"); }
+    }
+    if(a.state==="sleep"&&now>a.zzzAt){
+      const s=spriteSize(SLEEP_EX);
+      zzz.push({x:a.x+(a.facing===1?s.w*0.22:-s.w*0.35),y:a.groundY-s.h-3,life:1,big:Math.random()<0.4});
+      a.zzzAt=now+900+Math.random()*500;
+    }
+  });
+
+  actors.slice().sort((p,q)=>p.groundY-q.groundY).forEach(a=>{
+    const st=a.state==="play"?"sit":a.state;
+    const flip=(a.state==="sleep")?(a.facing===1):(a.facing===-1);
+    const spr=resolveSprite(a.c.skin,st,a.state==="walk"?a.frameT:now);
+    const {w,h}=spriteSize(spr.rows);
+    const x0=Math.round(a.x-w/2), y0=Math.round(a.groundY-h);
+    let tier = auraMode==="real" ? auraTierFor(a.c.mcap||0) : (auraMode==="off"?0:Number(auraMode));
+    if(tier>0&&a.state!=="sleep") drawAura(spr.rows,x0,y0,flip,tier,t,a.seed);
+    octx.globalAlpha=0.2; octx.fillStyle="#241B3A"; octx.fillRect(x0+2,a.groundY,w-4,2); octx.globalAlpha=1;
+    const ov=SKINS[a.c.skin]&&SKINS[a.c.skin].overlay;
+    if(ov&&ov.behind) drawOverlay(a.c.skin,st,x0,y0,flip,w,now);
+    if(spr.indexed) drawIdx(spr.rows,x0,y0,spr.colors,flip); else drawSprite(spr.rows,x0,y0,spr.colors,flip);
+    if(ov&&!ov.behind) drawOverlay(a.c.skin,st,x0,y0,flip,w,now);
+    if(a.c.crown){ octx.fillStyle="#FFD23F";
+      CROWN_SIT.forEach(p=>octx.fillRect(x0+(flip?w-1-p[0]:p[0]),y0+p[1]-3,1,1)); }
+    if(a.state==="play"){
+      const roll=Math.sin(t*2.2+a.yarnPhase);
+      const yx=Math.round(a.x+a.facing*(w/2+5)+roll*4*a.facing);
+      const hop=Math.round(Math.abs(Math.sin(t*7+a.yarnPhase))*2);
+      drawSprite((Math.floor(t*6)%2===0)?YARN_A:YARN_B, yx, a.groundY-10-hop, YARN_PAL, false);
+    }
+    a.tag.style.display=showLabels?'':'none';
+    a.tag.style.left=(a.x*cssScale)+'px';
+    a.tag.style.top=((y0-3)*cssScale)+'px';
+  });
+
+  stepEmbers(dt); stepZzz(dt);
+  ctx.imageSmoothingEnabled=false;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(off,0,0,canvas.width,canvas.height);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ================= controls ================= */
+document.querySelectorAll('[data-force]').forEach(b=>{
+  b.onclick=()=>{
+    forced=b.dataset.force;
+    document.querySelectorAll('[data-force]').forEach(x=>x.classList.toggle('on',x===b));
+    actors.forEach(a=>{ a.stateUntil=performance.now(); });
+  };
+});
+const auraModes=["real","off","1","2","3"];
+const auraLabels={real:"REAL",off:"OFF","1":"TIER 1","2":"TIER 2","3":"TIER 3"};
+document.getElementById('btnAura').onclick=e=>{
+  auraMode=auraModes[(auraModes.indexOf(auraMode)+1)%auraModes.length];
+  e.target.textContent="AURA: "+auraLabels[auraMode];
+};
+document.getElementById('btnLabels').onclick=e=>{
+  showLabels=!showLabels; e.target.textContent="LABELS: "+(showLabels?"ON":"OFF");
+};
+
+/* ================= pack drop ================= */
+function setStatus(m,ok){ const el=document.getElementById('status');
+  el.className='status show '+(ok?'ok':'err'); el.textContent=m; }
+function validRows(r){ return Array.isArray(r)&&r.length&&r.every(x=>typeof x==='string')
+  &&new Set(r.map(x=>x.length)).size===1; }
+let extra=[];
+async function handleFiles(files){
+  const names=[];
+  for(const f of files){
+    try{
+      const packs=[].concat(JSON.parse(await f.text()));
+      packs.forEach(p=>{
+        const key=(p.key||p.name||f.name.replace(/\.json$/i,'')).toLowerCase().replace(/[^a-z0-9_-]/g,'');
+        if(!validRows(p.sitRows)) throw new Error(f.name+': sitRows missing or uneven.');
+        if(!Array.isArray(p.sitColors)||!p.sitColors.length) throw new Error(f.name+': sitColors missing.');
+        SKINS[key]={label:p.label||key,sitRows:p.sitRows,sitColors:p.sitColors,
+          sleepColors:p.sleepColors||p.sitColors,
+          walkPal:p.walkPal||SKINS[Object.keys(SKINS)[0]].walkPal,
+          sitFrames:p.sitFrames,walkFrames:p.walkFrames,sleepFrames:p.sleepFrames,
+          sleepRows:validRows(p.sleepRows)?p.sleepRows:undefined,overlay:p.overlay};
+        extra.push({name:p.label||key,ticker:(p.label||key).toUpperCase().slice(0,10),skin:key,mcap:60000,released:false});
+        names.push(p.label||key);
+      });
+    }catch(e){ setStatus(e.message.slice(0,180),false); return; }
+  }
+  buildActors(baseList.concat(extra));
+  setStatus('Previewing: '+names.join(', '),true);
+}
+const dz=document.getElementById('dropZone'), pf=document.getElementById('packFile');
+dz.onclick=()=>pf.click();
+pf.onchange=e=>{handleFiles(e.target.files); pf.value='';};
+['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('over');}));
+dz.addEventListener('drop',e=>{ if(e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
+window.addEventListener('dragover',e=>e.preventDefault());
+window.addEventListener('drop',e=>e.preventDefault());
+
+/* ================= boot ================= */
+let baseList=[];
+(async function(){
+  let DATA=null;
+  try{
+    const res=await fetch('data.json?t='+Date.now(),{cache:'no-store'});
+    if(res.ok) DATA=await res.json();
+  }catch(e){}
+  if(DATA&&DATA.skins) Object.assign(SKINS,DATA.skins);
+  if(DATA&&Array.isArray(DATA.queue)&&DATA.queue.length){
+    const now=Date.now();
+    baseList=DATA.queue.slice()
+      .sort((a,b)=>new Date(a.releaseAt)-new Date(b.releaseAt))
+      .map(c=>Object.assign({},c,{released:new Date(c.releaseAt)<=now}));
+  } else {
+    baseList=Object.keys(SKINS).slice(0,6).map(k=>({name:SKINS[k].label,ticker:k.toUpperCase(),skin:k,mcap:60000,released:false}));
+    setStatus('No data.json found — showing the built-in cats instead.',true);
+  }
+  buildActors(baseList);
+})();
+</script>
+</body>
+</html>

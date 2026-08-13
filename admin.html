@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NINE LIVES — Drop Queue Admin</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Press+Start+2P&display=swap');
+  :root{ --paper:#FFF8EC; --ink:#241B3A; --pink:#FF6FA0; --blue:#4FC3E8; --yellow:#FFD23F; --green:#5BC97F; --red:#E8556F;
+         --display:'Fredoka',sans-serif; --pixel:'Press Start 2P',monospace; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{ background:linear-gradient(180deg,#EFE3D0 0%,#D9C2A2 50%,#B99972 100%); background-attachment:fixed;
+        font-family:var(--display); color:var(--ink); padding:20px clamp(12px,3vw,40px) 80px; }
+  .wrap{max-width:1000px;margin:0 auto;}
+  h1{font-family:var(--pixel);font-size:clamp(12px,2.4vw,18px);margin-bottom:6px;}
+  .sub{font-size:14px;font-weight:600;opacity:0.7;margin-bottom:22px;}
+  .card{background:var(--paper);border:3px solid var(--ink);border-radius:14px;box-shadow:6px 6px 0 var(--ink);padding:18px;margin-bottom:22px;}
+  .card h2{font-family:var(--pixel);font-size:10px;margin-bottom:14px;}
+  label{display:block;font-family:var(--pixel);font-size:7px;opacity:0.6;margin:12px 0 5px;}
+  input,textarea,select{width:100%;font-family:var(--display);font-weight:600;font-size:14px;padding:9px 11px;
+        border:2.5px solid var(--ink);border-radius:8px;background:#fff;}
+  textarea{min-height:60px;resize:vertical;}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media(max-width:620px){.row{grid-template-columns:1fr;}}
+  button{font-family:var(--pixel);font-size:8px;padding:11px 14px;border:2.5px solid var(--ink);border-radius:8px;
+        background:var(--yellow);box-shadow:3px 3px 0 var(--ink);cursor:pointer;}
+  button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink);}
+  button.primary{background:var(--green);} button.danger{background:var(--red);color:#fff;}
+  button.ghost{background:#fff;} button.small{font-size:6px;padding:7px 9px;}
+  .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+  .skins{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:10px;margin-top:6px;}
+  .skin{border:2.5px solid var(--ink);border-radius:8px;background:#EFE3D0;padding:6px;cursor:pointer;text-align:center;}
+  .skin.sel{background:var(--blue);box-shadow:3px 3px 0 var(--ink);}
+  .skin canvas{width:100%;image-rendering:pixelated;display:block;}
+  .skin span{font-family:var(--pixel);font-size:5px;display:block;margin-top:4px;line-height:1.5;}
+  .item{border:2.5px solid var(--ink);border-radius:10px;padding:12px;margin-bottom:12px;background:#FFFDF7;display:flex;gap:12px;align-items:flex-start;}
+  .item canvas{width:52px;height:52px;image-rendering:pixelated;border:2px solid var(--ink);border-radius:6px;background:#EFE3D0;flex-shrink:0;}
+  .item .meta{flex:1;min-width:0;}
+  .item .nm{font-weight:700;font-size:16px;}
+  .item .tk{font-family:var(--pixel);font-size:8px;color:#D63E75;margin:3px 0 6px;}
+  .item .when{font-family:var(--pixel);font-size:6px;opacity:0.6;line-height:1.7;}
+  .pill{display:inline-block;font-family:var(--pixel);font-size:6px;padding:4px 7px;border:2px solid var(--ink);border-radius:5px;margin-right:5px;}
+  .pill.live{background:var(--green);} .pill.queued{background:var(--yellow);} .pill.next{background:var(--pink);}
+  .acts{display:flex;flex-direction:column;gap:6px;}
+  .note{font-size:13px;font-weight:600;opacity:0.75;line-height:1.5;margin-top:10px;}
+  .status{font-family:var(--pixel);font-size:7px;padding:10px;border-radius:6px;margin-top:12px;display:none;line-height:1.8;}
+  .status.show{display:block;}
+  .status.ok{background:#D8F5E3;border:2px solid var(--green);}
+  .status.err{background:#FBDDE3;border:2px solid var(--red);}
+  code{font-family:var(--pixel);font-size:7px;background:#EFE3D0;padding:2px 5px;border-radius:4px;}
+  .quad{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .drop{border:3px dashed var(--ink);border-radius:12px;padding:22px 16px;text-align:center;background:#FFFDF7;cursor:pointer;transition:background .15s;}
+  .drop.over{background:var(--blue);}
+  .drop p{font-family:var(--pixel);font-size:8px;line-height:2;}
+  .drop small{display:block;font-family:var(--display);font-weight:600;font-size:13px;opacity:0.65;margin-top:8px;}
+  .packs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;margin-top:12px;}
+  .pack{border:2.5px solid var(--ink);border-radius:8px;background:#EFE3D0;padding:7px;text-align:center;position:relative;}
+  .pack canvas{width:100%;image-rendering:pixelated;display:block;}
+  .pack span{font-family:var(--pixel);font-size:5px;display:block;margin-top:5px;line-height:1.6;}
+  .pack .x{position:absolute;top:-7px;right:-7px;background:var(--red);color:#fff;border:2px solid var(--ink);
+        border-radius:50%;width:20px;height:20px;font-family:var(--pixel);font-size:7px;cursor:pointer;line-height:16px;}
+  .warn{background:#FFF3D6;border:2.5px solid var(--ink);border-radius:8px;padding:12px;font-size:13px;font-weight:600;line-height:1.55;margin-top:12px;}
+
+  #lockScreen{position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(180deg,#EFE3D0 0%,#D9C2A2 50%,#B99972 100%);padding:20px;}
+  #lockBox{background:var(--paper);border:3px solid var(--ink);border-radius:14px;box-shadow:6px 6px 0 var(--ink);
+    padding:26px 22px;max-width:360px;width:100%;text-align:center;}
+  #lockBox h2{font-family:var(--pixel);font-size:11px;margin-bottom:6px;}
+  #lockBox p{font-size:13px;font-weight:600;opacity:0.7;margin-bottom:16px;line-height:1.5;}
+  #lockBox input{text-align:center;margin-bottom:12px;}
+  #lockErr{font-family:var(--pixel);font-size:7px;color:#B81742;min-height:14px;line-height:1.8;}
+  #adminBody{display:none;}
+</style>
+</head>
+<body>
+
+<div id="lockScreen">
+  <div id="lockBox">
+    <h2>🔒 ADMIN LOCKED</h2>
+    <p>Enter the admin password to manage the drop queue.</p>
+    <input type="password" id="lockPw" placeholder="password" autocomplete="current-password">
+    <div class="btnrow" style="justify-content:center;">
+      <button class="primary" id="lockBtn">UNLOCK</button>
+    </div>
+    <div id="lockErr"></div>
+  </div>
+</div>
+
+<div id="adminBody">
+<div class="wrap">
+  <h1>DROP QUEUE ADMIN</h1>
+  <p class="sub">Coins release themselves at their scheduled time. Use this to see the queue and add more.</p>
+  <div class="btnrow" style="margin-bottom:18px;">
+    <button class="ghost" onclick="window.open('preview.html','_blank')">OPEN PREVIEW ROOM</button>
+    <button class="ghost" onclick="window.open('index.html','_blank')">OPEN LIVE SITE</button>
+  </div>
+
+  <div class="card">
+    <h2>LINKS</h2>
+    <label>TWITTER / X URL</label>
+    <input id="fTwitter" placeholder="https://x.com/yourhandle">
+    <div class="btnrow">
+      <button class="primary" id="btnSaveSocial">SAVE LINK</button>
+      <button class="ghost small" id="btnClearSocial">REMOVE LINK</button>
+    </div>
+    <p class="note">Shows as a FOLLOW button in the site header. Leave it empty and the button hides itself.</p>
+    <div class="status" id="socialStatus"></div>
+  </div>
+
+  <div class="card">
+    <h2>QUEUE</h2>
+    <div id="queueList"></div>
+    <div class="btnrow">
+      <button class="ghost small" id="btnSpace">AUTO-SPACE UPCOMING</button>
+      <button class="ghost small" id="btnReload">RELOAD FROM FILE</button>
+    </div>
+    <p class="note">Auto-space restacks every unreleased coin at the interval below, starting from the next one.</p>
+    <div class="row">
+      <div><label>DROP INTERVAL — HOURS</label><input type="number" id="interval" min="0" step="1" value="48"></div>
+      <div><label>DROP INTERVAL — MINUTES</label><input type="number" id="intervalMin" min="0" max="59" step="1" value="0"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 id="formTitle">ADD A COIN TO THE QUEUE</h2>
+    <div class="row">
+      <div><label>NAME</label><input id="fName" placeholder="Countess Mimi"></div>
+      <div><label>TICKER</label><input id="fTicker" placeholder="$MIMI"></div>
+    </div>
+    <div class="row">
+      <div><label>DROP TIME (YOUR LOCAL TIME — TO THE SECOND)</label><input type="datetime-local" id="fWhen" step="1"></div>
+      <div><label>MARKET CAP (USD)</label><input type="number" id="fMcap" value="0" min="0" step="100"></div>
+    </div>
+    <label>OR SET IT AS TIME FROM NOW</label>
+    <div class="quad">
+      <div><input type="number" id="offD" min="0" step="1" placeholder="0"><div class="cd-cap-lbl">DAYS</div></div>
+      <div><input type="number" id="offH" min="0" step="1" placeholder="0"><div class="cd-cap-lbl">HOURS</div></div>
+      <div><input type="number" id="offM" min="0" step="1" placeholder="0"><div class="cd-cap-lbl">MINUTES</div></div>
+      <div><input type="number" id="offS" min="0" step="1" placeholder="0"><div class="cd-cap-lbl">SECONDS</div></div>
+    </div>
+    <div class="btnrow"><button class="ghost small" id="btnOffset">APPLY TIME FROM NOW</button></div>
+
+    <label>CONTRACT ADDRESS (OPTIONAL)</label>
+    <input id="fAddr" placeholder="Solana token address">
+    <label>TEASER VIDEO URL (OPTIONAL)</label>
+    <input id="fVideo" placeholder="teasers/mimi.mp4">
+    <label>DESCRIPTION</label>
+    <textarea id="fDesc" placeholder="What this drop is."></textarea>
+    <label>CAT</label>
+    <div class="skins" id="skinPick"></div>
+    <div class="row" style="margin-top:14px;">
+      <div><label>CROWN</label><select id="fCrown"><option value="">No</option><option value="1">Yes</option></select></div>
+      <div><label>STATIC FLICKER</label><select id="fFlicker"><option value="">No</option><option value="1">Yes</option></select></div>
+    </div>
+    <div class="btnrow">
+      <button class="primary" id="btnSave">SAVE COIN</button>
+      <button class="ghost" id="btnCancel" style="display:none;">CANCEL EDIT</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>CUSTOM CAT SPRITES</h2>
+    <div class="drop" id="dropZone">
+      <p>DROP A SPRITE PACK HERE</p>
+      <small>A <code>.json</code> pack file, or click to browse. Custom cats appear in the picker above.</small>
+      <input type="file" id="packFile" accept=".json,application/json" multiple style="display:none;">
+    </div>
+    <div class="packs" id="packList"></div>
+    <p class="note">Send reference art and the pack gets built for you — walk cycle, sleep pose, and any animated
+    extras like wings or a flame tail. Drop the file here and that cat is selectable straight away.</p>
+    <div class="btnrow"><button class="ghost small" id="btnPackTemplate">DOWNLOAD PACK TEMPLATE</button></div>
+    <div class="status" id="packStatus"></div>
+  </div>
+
+  <div class="card">
+    <h2>ADMIN PASSWORD</h2>
+    <label>NEW PASSWORD</label>
+    <input type="password" id="newPw" placeholder="pick something only you know">
+    <div class="btnrow">
+      <button class="primary" id="btnSetPw">SET PASSWORD</button>
+    </div>
+    <p class="note">This changes the password on this browser straight away. To make it apply everywhere,
+    copy the line below into admin.html (replace the existing ADMIN_HASH line) and re-upload the file.</p>
+    <textarea id="pwHashOut" readonly style="display:none;font-family:monospace;font-size:11px;"></textarea>
+    <div class="status" id="pwStatus"></div>
+    <div class="warn">
+      This lock keeps casual visitors out, but it runs in the browser and can be bypassed by anyone
+      who reads the page source. Your <b>data.json is public either way</b>, so treat queued coins as
+      visible. For real protection, put the site behind Cloudflare Access (free) or host the admin separately.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>PUBLISH</h2>
+    <p class="note">Nothing is live until you publish. Publishing writes <code>data.json</code> next to your site.</p>
+    <div class="btnrow">
+      <button id="btnDownload">DOWNLOAD data.json</button>
+      <button id="btnCopy">COPY JSON</button>
+    </div>
+    <div class="warn" style="background:#DDF3E4;">
+      <b>Keep this file off the internet.</b> Don't upload admin.html to your repo — run it from your
+      own computer by double-clicking it. Publishing still works, because it talks to GitHub directly.
+      Nothing to break into if the page was never hosted.
+    </div>
+    <div class="warn">
+      <b>Publish straight to GitHub</b> — fill these in once and the button below commits for you.
+      Use a <b>fine-grained</b> token limited to this one repo with <b>Contents: read and write</b>. Nothing else.
+      It is stored only in this browser. If your phone or laptop is shared, use the download button instead.
+    </div>
+    <div class="row">
+      <div><label>REPO (user/name)</label><input id="ghRepo" placeholder="zaylord/nine-lives"></div>
+      <div><label>BRANCH</label><input id="ghBranch" value="main"></div>
+    </div>
+    <label>GITHUB TOKEN</label>
+    <input type="password" id="ghToken" placeholder="github_pat_...">
+    <div class="btnrow">
+      <button class="primary" id="btnPublish">PUBLISH TO GITHUB</button>
+      <button class="ghost small" id="btnForget">FORGET TOKEN</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+</div>
+</div>
+
+<script>
+/* ============ ADMIN GATE ============
+   Deterrent only: this check happens in the browser, so a determined person
+   can bypass it by reading the page source. It stops casual visitors, not attackers.
+   Note that data.json is public regardless, so the queue itself is never secret.
+   To change the password: unlock, then use CHANGE PASSWORD at the bottom of the page. */
+const ADMIN_SALT = "ninelives-admin-v1";
+let ADMIN_HASH = "160c8f6fc9f5427899419a51698fb2bc5b58e501f7dc6c0a8877e47bcfe97a20"; // default: ninelives
+
+async function sha256(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function unlockAdmin(){
+  document.getElementById('lockScreen').style.display='none';
+  document.getElementById('adminBody').style.display='';
+}
+async function tryUnlock(){
+  const pw = document.getElementById('lockPw').value;
+  const err = document.getElementById('lockErr');
+  if(!pw){ err.textContent='Enter the password.'; return; }
+  const hash = await sha256(ADMIN_SALT + pw);
+  const stored = localStorage.getItem('nl_adminhash') || ADMIN_HASH;
+  if(hash === stored){
+    sessionStorage.setItem('nl_unlocked','1');
+    err.textContent='';
+    unlockAdmin();
+  } else {
+    err.textContent='Wrong password.';
+    document.getElementById('lockPw').value='';
+  }
+}
+document.getElementById('lockBtn').onclick = tryUnlock;
+document.getElementById('lockPw').addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
+if(sessionStorage.getItem('nl_unlocked')==='1') unlockAdmin();
+else setTimeout(()=>document.getElementById('lockPw').focus(), 60);
+const SLEEP_EX = [
+  "..01........20...............",
+  ".0161......2070..............",
+  ".01661....20770..............",
+  ".01066100000770022...........",
+  ".0100600111107002300222......",
+  ".016001111111102200022002....",
+  ".0001111111311020002200002...",
+  "000111222133322000021100022..",
+  ".041120002332004200111100202.",
+  "0014433003333042220111102010.",
+  ".0543433336003444244111020102",
+  "..444333533635422444411201102",
+  "...53443355454242443342011102",
+  "....4..444444002553333011102.",
+  ".......34340000.55533111102..",
+];
+const SKINS = {"shadow":{"label":"Shadow (black)","sitRows":["...2......2..........","..000....002.........","..2300..00002........","..03002000302........","..00000003302........","..00000000302........","..03000300002........",".2021002100002.......",".20233321000002..22..","21331033333102..0330.",".211030313102...01332","..213333100002...2002","...200311000002..2002","..2013330000002..2002","...2000030000002.2002","...20133310000002002.","...20013332000002002.","....200130200000002..","....20213201000002...","....2121121331022....",".....2222222222......"],"sitColors":["#282425","#585152","#010000","#685758"],"sleepColors":["#585152","#8a8586","#282425","#aca3a3","#867f7f","#645f5f","#e58ba8","#955a6d"],"walkPal":{"O":"#010000","B":"#585152","H":"#878282","S":"#2c2829","W":"#aca3a3","P":"#e58ba8","N":"#e58ba8","E":"#010000","K":"#a67181"}},"smoke":{"label":"Smoke (grey tabby)","sitRows":["...0......0..........","..010....020.........","..0310..02120........","..03100001310........","..01010103310........","..02121212310........","..03222322110........",".0245224522110.......",".02433345211110..00..","45335233333510..0330.",".453232333504...05330","..453333500214...0110","...402355211004..0210","..4253332122114..0120","...4222232211004.0210","...42533351112104124.","...40253330012214114.","....402532022110014..","....42453015221104...","....4545505335144....",".....4444444444......"],"sitColors":["#312a29","#635353","#8a7575","#eac8c9","#020100","#b69a9c"],"sleepColors":["#635353","#928787","#483c3c","#a9a0a0","#8f8686","#776e6e","#8a7575","#5a4c4c"],"walkPal":{"O":"#312a29","B":"#635353","H":"#8f8383","S":"#4a3e3e","W":"#a9a0a0","P":"#8a7575","N":"#8a7575","E":"#312a29","K":"#786666"}},"ginger":{"label":"Ginger (orange)","sitRows":["...1......1..........","..131....101.........","..1031..10301........","..14111133031........","..11033334431........","..10303000431........","..10040000331........",".1024442000331.......",".10244420033331..11..","20004044004031..1441.",".204040444012...14442","..204444411032...1342","...220400003112..1032","...244444000032..1002","...2004440000112.1002","....1444400300312302.","....1144441300032332.","....201444100033132..","....20204130000312...","....2020410440322....",".....2222222222......"],"sitColors":["#fdc8ad","#6f2805","#020102","#fb8b4d","#fbe1d0"],"sleepColors":["#fb8b4d","#fcae82","#723f24","#fdc8ad","#c69c87","#947465","#e58ba8","#955a6d"],"walkPal":{"O":"#020102","B":"#fb8b4d","H":"#fcab7f","S":"#7e4628","W":"#fdc8ad","P":"#e58ba8","N":"#e58ba8","E":"#020102","K":"#ef8b7f"}},"slate":{"label":"Slate (dark grey)","sitRows":["...2......0..........","..000....010.........","..2300..01010........","..03000000300........","..00000003300........","..01010101300........","..03111311000........",".0121112111000.......",".01233321100000..00..","21331133333100..0330.",".213131333102...01332","..213333100102...0002","...201311100002..0102","..2113331011002..0012","...2111131100002.0102","...21133310001002012.","...20113332011102002.","....201131211000002..","....21213201110002...","....2121121331022....",".....2222222222......"],"sitColors":["#333131","#585454","#010101","#837a7b"],"sleepColors":["#585454","#8a8787","#282626","#bbb6b6","#928e8e","#6d6a6a","#e58ba8","#955a6d"],"walkPal":{"O":"#010101","B":"#585454","H":"#878484","S":"#2c2a2a","W":"#bbb6b6","P":"#e58ba8","N":"#e58ba8","E":"#010101","K":"#a67282"}},"ash":{"label":"Ash (grey)","sitRows":["...0......0..........","..000....210.........","..0500..01010........","..03000000500........","..00000103300........","..01010101300........","..04111411000........",".0121112111100.......",".01233321100100..20..","21551133553100..0330.",".213131333102...01332","..213333100142...0002","...201311100552..0102","..2113331011002..0012","...2111131100002.0102","...21133310001102012.","...20113332001102002.","....201131211000002..","....21213201110002...","....2121121331022....",".....2222222222......"],"sitColors":["#343131","#585354","#010101","#837b7b","#de8e54","#a36b44"],"sleepColors":["#585354","#8a8787","#282626","#bbb6b6","#928e8e","#6d6a6a","#e58ba8","#955a6d"],"walkPal":{"O":"#010101","B":"#585354","H":"#878384","S":"#2c2a2a","W":"#bbb6b6","P":"#e58ba8","N":"#e58ba8","E":"#010101","K":"#a67282"}},"midnight":{"label":"Midnight (jet black)","sitRows":["...0......0..........","..000....000.........","..0200..00000........","..01000000200........","..00000001100........","..00000000100........","..01000100000........",".0001000100000.......",".00011101000000..00..","01221011221100..0000.",".011010111100...01000","..011111100000...0000","...000111000000..0000","..0011110000000..0000","...0000010000000.0000","...00111110000000000.","...00011110000000000.","....000110000000000..","....00011001000000...","....0101101111000....",".....0000000000......"],"sitColors":["#0b0b0b","#2f2f2f","#814f52"],"sleepColors":["#2f2f2f","#6d6d6d","#1b1b1b","#8d8d8d","#707070","#565656","#814f52","#543335"],"walkPal":{"O":"#0b0b0b","B":"#2f2f2f","H":"#696969","S":"#1d1d1d","W":"#8d8d8d","P":"#814f52","N":"#814f52","E":"#0b0b0b","K":"#5c4142"}},"silver":{"label":"Silver (light grey)","sitRows":["...0......0..........","..010....020.........","..0510..02120........","..03100001510........","..01010103310........","..02121212310........","..03222322110........",".0245224522110.......",".02433345211110..00..","45555233553510..0330.",".453232333504...05330","..453333500214...0110","...402355211004..0210","..4253332122114..0120","...4222232211004.0210","...42533351112104124.","...40253330012214114.","....402532022110014..","....42453015221104...","....4545505335144....",".....4444444444......"],"sitColors":["#353233","#6c6868","#989393","#fefdfd","#010000","#d0bcbe"],"sleepColors":["#989393","#b7b3b3","#625e5e","#fefdfd","#d2d0d1","#aaa8a8","#d0bcbe","#877a7c"],"walkPal":{"O":"#353233","B":"#989393","H":"#b5b1b1","S":"#666263","W":"#fefdfd","P":"#d0bcbe","N":"#d0bcbe","E":"#353233","K":"#b7aaab"}},"cocoa":{"label":"Cocoa (brown)","sitRows":["...0......0..........","..000....020.........","..0100..02020........","..01000000100........","..00000001100........","..02020202100........","..01222122000........",".0202220222000.......",".02011102200000..00..","02112011111200..0110.",".021010111200...02110","..021111200200...0000","...002122200000..0200","..0221112022000..0020","...0222212200000.0200","...02211120002000020.","...00221110002200000.","....002212022000000..","....02021002220000...","....0202202112000....",".....0000000000......"],"sitColors":["#2a1304","#8e5029","#622e09"],"sleepColors":["#622e09","#916d53","#431f06","#c19f89","#a0806c","#826451","#e58ba8","#955a6d"],"walkPal":{"O":"#2a1304","B":"#622e09","H":"#8e694e","S":"#462006","W":"#c19f89","P":"#e58ba8","N":"#e58ba8","E":"#2a1304","K":"#aa6160"}}};
+
+const IDX = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const LS = "nineLivesAdmin";
+let DATA = { dropIntervalHours: 48, queue: [] };
+let editIndex = -1;
+let pickedSkin = Object.keys(SKINS)[0];
+
+/* ---------- helpers ---------- */
+function drawSkin(canvas, skinKey, scale){
+  const s = SKINS[skinKey]; if(!s) return;
+  const rows = s.sitRows, w = rows[0].length, h = rows.length;
+  canvas.width = w; canvas.height = h;
+  const c = canvas.getContext('2d');
+  c.clearRect(0,0,w,h);
+  for(let r=0;r<h;r++) for(let x=0;x<w;x++){
+    const t = rows[r][x];
+    if(t==='.') continue;
+    c.fillStyle = s.sitColors[IDX.indexOf(t)];
+    c.fillRect(x,r,1,1);
+  }
+}
+function toLocalInput(iso){
+  const d = new Date(iso);
+  const p = n => String(n).padStart(2,'0');
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());
+}
+function fmtWhen(iso){
+  const d = new Date(iso);
+  return d.toLocaleString(undefined,{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit'});
+}
+function until(iso){
+  let ms = new Date(iso) - Date.now();
+  if(ms <= 0) return "released";
+  const s = Math.floor(ms/1000)%60, m = Math.floor(ms/60000)%60;
+  const h = Math.floor(ms/3600000)%24, d = Math.floor(ms/86400000);
+  if(d >= 1) return "in "+d+"d "+h+"h "+m+"m";
+  if(h >= 1) return "in "+h+"h "+m+"m "+s+"s";
+  return "in "+m+"m "+s+"s";
+}
+function setIntervalFields(){
+  const mins = DATA.dropIntervalMinutes || (DATA.dropIntervalHours ? DATA.dropIntervalHours*60 : 48*60);
+  document.getElementById('interval').value = Math.floor(mins/60);
+  document.getElementById('intervalMin').value = mins % 60;
+}
+function sortQueue(){ DATA.queue.sort((a,b)=> new Date(a.releaseAt) - new Date(b.releaseAt)); }
+function save(){ localStorage.setItem(LS, JSON.stringify(DATA)); }
+function setStatus(msg, ok){
+  const el = document.getElementById('status');
+  el.className = 'status show ' + (ok ? 'ok' : 'err');
+  el.textContent = msg;
+}
+
+/* ---------- render ---------- */
+function renderQueue(){
+  sortQueue();
+  const host = document.getElementById('queueList');
+  host.innerHTML = '';
+  if(!DATA.queue.length){ host.innerHTML = '<p class="note">Queue is empty. Add a coin below.</p>'; return; }
+  const now = Date.now();
+  let nextFlagged = false;
+  DATA.queue.forEach((c,i)=>{
+    const released = new Date(c.releaseAt) <= now;
+    const isNext = !released && !nextFlagged;
+    if(isNext) nextFlagged = true;
+    const row = document.createElement('div');
+    row.className = 'item';
+    row.innerHTML =
+      '<canvas></canvas>' +
+      '<div class="meta">' +
+        '<div class="nm">' + (c.name||'Untitled') + '</div>' +
+        '<div class="tk">' + (c.ticker||'') + '</div>' +
+        '<div>' +
+          (released ? '<span class="pill live">LIVE</span>' : '<span class="pill queued">QUEUED</span>') +
+          (isNext ? '<span class="pill next">UP NEXT</span>' : '') +
+        '</div>' +
+        '<div class="when">' + fmtWhen(c.releaseAt) + ' · ' + until(c.releaseAt) + '</div>' +
+      '</div>' +
+      '<div class="acts">' +
+        '<button class="ghost small" data-act="edit" data-i="'+i+'">EDIT</button>' +
+        '<button class="danger small" data-act="del" data-i="'+i+'">DEL</button>' +
+      '</div>';
+    host.appendChild(row);
+    drawSkin(row.querySelector('canvas'), c.skin);
+  });
+  host.querySelectorAll('button').forEach(b=>{
+    b.onclick = () => {
+      const i = +b.dataset.i;
+      if(b.dataset.act === 'del'){
+        if(confirm('Remove ' + (DATA.queue[i].name||'this coin') + ' from the queue?')){
+          DATA.queue.splice(i,1); save(); renderQueue();
+        }
+      } else { startEdit(i); }
+    };
+  });
+}
+
+function renderSkinPicker(){
+  const host = document.getElementById('skinPick');
+  host.innerHTML = '';
+  Object.keys(SKINS).forEach(k=>{
+    const d = document.createElement('div');
+    d.className = 'skin' + (k===pickedSkin ? ' sel' : '');
+    d.innerHTML = '<canvas></canvas><span>' + SKINS[k].label + '</span>';
+    d.onclick = () => { pickedSkin = k; renderSkinPicker(); };
+    host.appendChild(d);
+    drawSkin(d.querySelector('canvas'), k);
+  });
+}
+
+/* ---------- form ---------- */
+function clearForm(){
+  editIndex = -1;
+  ['fName','fTicker','fAddr','fVideo','fDesc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fMcap').value = 0;
+  document.getElementById('fCrown').value = '';
+  document.getElementById('fFlicker').value = '';
+  let base = Date.now();
+  const up = DATA.queue.filter(c=> new Date(c.releaseAt) > Date.now());
+  if(up.length) base = new Date(up[up.length-1].releaseAt).getTime();
+  document.getElementById('fWhen').value = toLocalInput(new Date(base + intervalMs()));
+  document.getElementById('formTitle').textContent = 'ADD A COIN TO THE QUEUE';
+  document.getElementById('btnCancel').style.display = 'none';
+}
+function startEdit(i){
+  const c = DATA.queue[i];
+  editIndex = i;
+  document.getElementById('fName').value = c.name||'';
+  document.getElementById('fTicker').value = c.ticker||'';
+  document.getElementById('fAddr').value = c.address||'';
+  document.getElementById('fVideo').value = c.video||'';
+  document.getElementById('fDesc').value = c.desc||'';
+  document.getElementById('fMcap').value = c.mcap||0;
+  document.getElementById('fCrown').value = c.crown ? '1' : '';
+  document.getElementById('fFlicker').value = c.flicker ? '1' : '';
+  document.getElementById('fWhen').value = toLocalInput(c.releaseAt);
+  pickedSkin = c.skin || Object.keys(SKINS)[0];
+  renderSkinPicker();
+  document.getElementById('formTitle').textContent = 'EDITING: ' + (c.name||'coin');
+  document.getElementById('btnCancel').style.display = '';
+  window.scrollTo({top:document.getElementById('formTitle').offsetTop-40, behavior:'smooth'});
+}
+
+document.getElementById('btnSave').onclick = () => {
+  const name = document.getElementById('fName').value.trim();
+  const when = document.getElementById('fWhen').value;
+  if(!name){ alert('Give the coin a name.'); return; }
+  if(!when){ alert('Pick a drop time.'); return; }
+  let ticker = document.getElementById('fTicker').value.trim().toUpperCase();
+  if(ticker && ticker[0] !== '$') ticker = '$' + ticker;
+  const entry = {
+    name, ticker, skin: pickedSkin,
+    mcap: +document.getElementById('fMcap').value || 0,
+    address: document.getElementById('fAddr').value.trim(),
+    video: document.getElementById('fVideo').value.trim(),
+    desc: document.getElementById('fDesc').value.trim(),
+    releaseAt: new Date(when).toISOString()
+  };
+  if(document.getElementById('fCrown').value) entry.crown = true;
+  if(document.getElementById('fFlicker').value) entry.flicker = true;
+  if(editIndex >= 0) DATA.queue[editIndex] = entry; else DATA.queue.push(entry);
+  DATA.dropIntervalMinutes = Math.round(intervalMs()/60000);
+  save(); renderQueue(); clearForm();
+  setStatus('Saved locally. Hit PUBLISH to push it live.', true);
+};
+document.getElementById('btnCancel').onclick = clearForm;
+
+function intervalMs(){
+  const hrs = +document.getElementById('interval').value || 0;
+  const min = +document.getElementById('intervalMin').value || 0;
+  const ms = (hrs*60 + min) * 60000;
+  return ms > 0 ? ms : 48*3600000;
+}
+
+document.getElementById('btnOffset').onclick = () => {
+  const d = +document.getElementById('offD').value || 0;
+  const h = +document.getElementById('offH').value || 0;
+  const m = +document.getElementById('offM').value || 0;
+  const s = +document.getElementById('offS').value || 0;
+  const total = ((d*24 + h)*60 + m)*60000 + s*1000;
+  if(total <= 0){ alert('Enter how long from now this should drop.'); return; }
+  document.getElementById('fWhen').value = toLocalInput(new Date(Date.now() + total));
+  ['offD','offH','offM','offS'].forEach(id=>document.getElementById(id).value='');
+};
+
+/* ---------- data source (works local or hosted) ---------- */
+function repoRawUrl(){
+  const repo=(localStorage.getItem('nl_repo')||'').trim();
+  const branch=(localStorage.getItem('nl_branch')||'main').trim();
+  if(!repo) return null;
+  return 'https://raw.githubusercontent.com/'+repo+'/'+branch+'/data.json?t='+Date.now();
+}
+async function fetchData(){
+  // local file first tries the repo, hosted tries the neighbouring file
+  const local = location.protocol === 'file:';
+  const urls = local
+    ? [repoRawUrl()]
+    : ['data.json?t='+Date.now(), repoRawUrl()];
+  for(const u of urls){
+    if(!u) continue;
+    try{
+      const res = await fetch(u, {cache:'no-store'});
+      if(res.ok) return await res.json();
+    }catch(e){ /* try the next one */ }
+  }
+  return null;
+}
+
+/* ---------- admin password ---------- */
+document.getElementById('btnSetPw').onclick = async () => {
+  const pw = document.getElementById('newPw').value;
+  const st = document.getElementById('pwStatus');
+  if(pw.length < 4){ st.className='status show err'; st.textContent='Use at least 4 characters.'; return; }
+  const hash = await sha256(ADMIN_SALT + pw);
+  localStorage.setItem('nl_adminhash', hash);
+  ADMIN_HASH = hash;
+  const out = document.getElementById('pwHashOut');
+  out.style.display='';
+  out.value = 'let ADMIN_HASH = "' + hash + '";';
+  out.rows = 3;
+  document.getElementById('newPw').value='';
+  st.className='status show ok';
+  st.textContent='Password changed on this browser. Copy the line above into admin.html to apply it everywhere.';
+};
+
+/* ---------- links ---------- */
+function setSocialStatus(m,ok){
+  const el=document.getElementById('socialStatus');
+  el.className='status show '+(ok?'ok':'err'); el.textContent=m;
+}
+function renderSocial(){
+  document.getElementById('fTwitter').value = (DATA.social && DATA.social.twitter) || '';
+}
+document.getElementById('btnSaveSocial').onclick = () => {
+  let v=document.getElementById('fTwitter').value.trim();
+  if(v){
+    if(!/^https?:\/\//i.test(v)) v='https://'+v.replace(/^\/+/,'');
+    try{
+      const u=new URL(v);
+      if(!/(^|\.)(x\.com|twitter\.com)$/i.test(u.hostname)){
+        setSocialStatus('That is not an x.com or twitter.com link. Saved anyway.',true);
+      }
+    }catch(e){ setSocialStatus('That does not look like a valid URL.',false); return; }
+  }
+  DATA.social = DATA.social || {};
+  DATA.social.twitter = v;
+  document.getElementById('fTwitter').value = v;
+  save();
+  if(v) setSocialStatus('Saved. Hit PUBLISH to put it live.',true);
+  else setSocialStatus('Link cleared. Publish to hide the button.',true);
+};
+document.getElementById('btnClearSocial').onclick = () => {
+  DATA.social=DATA.social||{}; DATA.social.twitter='';
+  document.getElementById('fTwitter').value='';
+  save(); setSocialStatus('Link cleared. Publish to hide the button.',true);
+};
+
+/* ---------- custom sprite packs ---------- */
+function packCount(){ return Object.keys(DATA.skins||{}).length; }
+
+function renderPacks(){
+  const host = document.getElementById('packList');
+  host.innerHTML = '';
+  const custom = DATA.skins || {};
+  const keys = Object.keys(custom);
+  if(!keys.length){ host.innerHTML = '<p class="note">No custom cats loaded yet.</p>'; return; }
+  keys.forEach(k=>{
+    const d = document.createElement('div');
+    d.className = 'pack';
+    d.innerHTML = '<canvas></canvas><span>' + (custom[k].label||k) + '</span><div class="x" title="Remove">X</div>';
+    host.appendChild(d);
+    drawSkin(d.querySelector('canvas'), k);
+    d.querySelector('.x').onclick = () => {
+      if(!confirm('Remove the "' + (custom[k].label||k) + '" sprite pack?')) return;
+      const inUse = DATA.queue.filter(c=>c.skin===k).map(c=>c.name||c.ticker);
+      if(inUse.length && !confirm('Still used by: ' + inUse.join(', ') + '. Remove anyway?')) return;
+      delete DATA.skins[k];
+      delete SKINS[k];
+      if(pickedSkin===k) pickedSkin = Object.keys(SKINS)[0];
+      save(); renderPacks(); renderSkinPicker(); renderQueue();
+    };
+  });
+}
+
+function setPackStatus(msg, ok){
+  const el = document.getElementById('packStatus');
+  el.className = 'status show ' + (ok ? 'ok' : 'err');
+  el.textContent = msg;
+}
+
+function validRows(r){
+  return Array.isArray(r) && r.length > 0 && r.every(x => typeof x === 'string')
+    && new Set(r.map(x=>x.length)).size === 1;
+}
+
+function loadPack(obj, filename){
+  const key = (obj.key || obj.name || filename.replace(/\.json$/i,'')).toLowerCase().replace(/[^a-z0-9_-]/g,'');
+  if(!key) throw new Error(filename + ': the pack needs a key or name.');
+  if(!validRows(obj.sitRows)) throw new Error(filename + ': sitRows missing, empty, or rows are uneven lengths.');
+  if(!Array.isArray(obj.sitColors) || !obj.sitColors.length) throw new Error(filename + ': sitColors missing.');
+  const skin = {
+    label: obj.label || key,
+    sitRows: obj.sitRows,
+    sitColors: obj.sitColors,
+    sleepColors: obj.sleepColors || obj.sitColors,
+    walkPal: obj.walkPal || SKINS[Object.keys(SKINS)[0]].walkPal
+  };
+  ['sitFrames','walkFrames','sleepFrames'].forEach(f=>{
+    if(Array.isArray(obj[f]) && obj[f].length){
+      obj[f].forEach((fr,i)=>{ if(!validRows(fr.rows)) throw new Error(filename+': '+f+' frame '+(i+1)+' has uneven rows.'); });
+      skin[f] = obj[f];
+    }
+  });
+  if(validRows(obj.sleepRows)) skin.sleepRows = obj.sleepRows;
+  if(obj.overlay) skin.overlay = obj.overlay;
+  DATA.skins = DATA.skins || {};
+  DATA.skins[key] = skin;
+  SKINS[key] = skin;
+  return skin.label;
+}
+
+async function handleFiles(files){
+  const names = [];
+  for(const f of files){
+    try{
+      const txt = await f.text();
+      const obj = JSON.parse(txt);
+      const packs = Array.isArray(obj) ? obj : [obj];
+      packs.forEach(p => names.push(loadPack(p, f.name)));
+    }catch(e){
+      setPackStatus(e.message.slice(0,180), false);
+      return;
+    }
+  }
+  save(); renderPacks(); renderSkinPicker();
+  setPackStatus('Loaded: ' + names.join(', ') + '. Publish to make it live.', true);
+}
+
+const dz = document.getElementById('dropZone');
+const pf = document.getElementById('packFile');
+dz.onclick = () => pf.click();
+pf.onchange = e => { handleFiles(e.target.files); pf.value=''; };
+['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('over'); }));
+dz.addEventListener('drop', e => { if(e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
+
+document.getElementById('btnPackTemplate').onclick = () => {
+  const base = SKINS[Object.keys(SKINS)[0]];
+  const tpl = {
+    key: "my-custom-cat",
+    label: "My Custom Cat",
+    sitRows: base.sitRows,
+    sitColors: base.sitColors,
+    sleepColors: base.sleepColors,
+    walkPal: base.walkPal,
+    overlay: { fps: 8, behind: false, sit: [ { dx:0, dy:-4, rows:["...."], colors:["#ff9a3d"] } ] }
+  };
+  const blob = new Blob([JSON.stringify(tpl,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'sprite-pack-template.json'; a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+document.getElementById('btnSpace').onclick = () => {
+  const ms = intervalMs();
+  sortQueue();
+  const up = DATA.queue.filter(c=> new Date(c.releaseAt) > Date.now());
+  if(!up.length){ alert('No upcoming coins to space out.'); return; }
+  let t = new Date(up[0].releaseAt).getTime();
+  up.forEach((c,i)=>{ c.releaseAt = new Date(t + i*ms).toISOString(); });
+  DATA.dropIntervalMinutes = Math.round(ms/60000);
+  save(); renderQueue();
+  const hh=Math.floor(ms/3600000), mm=Math.round(ms%3600000/60000);
+  setStatus('Upcoming drops restacked every ' + hh + 'h ' + mm + 'm.', true);
+};
+
+/* ---------- publish ---------- */
+function jsonOut(){
+  DATA.dropIntervalMinutes = Math.round(intervalMs()/60000);
+  sortQueue();
+  return JSON.stringify(DATA, null, 2);
+}
+document.getElementById('btnDownload').onclick = () => {
+  const blob = new Blob([jsonOut()], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'data.json'; a.click();
+  URL.revokeObjectURL(a.href);
+};
+document.getElementById('btnCopy').onclick = async () => {
+  try{ await navigator.clipboard.writeText(jsonOut()); setStatus('JSON copied.', true); }
+  catch(e){ setStatus('Copy failed — use download instead.', false); }
+};
+
+const gh = { repo:'ghRepo', branch:'ghBranch', token:'ghToken' };
+// keep repo/branch handy for loading data.json when running as a local file
+Object.entries(gh).forEach(([k,id])=>{
+  const v = localStorage.getItem('nl_'+k);
+  if(v) document.getElementById(id).value = v;
+  document.getElementById(id).addEventListener('change', e => localStorage.setItem('nl_'+k, e.target.value.trim()));
+});
+document.getElementById('btnForget').onclick = () => {
+  localStorage.removeItem('nl_token');
+  document.getElementById('ghToken').value = '';
+  setStatus('Token cleared from this browser.', true);
+};
+
+document.getElementById('btnPublish').onclick = async () => {
+  const repo = document.getElementById('ghRepo').value.trim();
+  const branch = document.getElementById('ghBranch').value.trim() || 'main';
+  const token = document.getElementById('ghToken').value.trim();
+  if(!repo || !token){ setStatus('Repo and token are both needed to publish.', false); return; }
+  const url = 'https://api.github.com/repos/' + repo + '/contents/data.json';
+  setStatus('Publishing...', true);
+  try{
+    let sha;
+    const cur = await fetch(url + '?ref=' + branch, { headers:{ Authorization:'Bearer '+token, Accept:'application/vnd.github+json' }});
+    if(cur.ok){ sha = (await cur.json()).sha; }
+    else if(cur.status !== 404){ throw new Error('GitHub said ' + cur.status + ' when checking the file.'); }
+    const body = { message:'Update drop queue', content: btoa(unescape(encodeURIComponent(jsonOut()))), branch };
+    if(sha) body.sha = sha;
+    const res = await fetch(url, {
+      method:'PUT',
+      headers:{ Authorization:'Bearer '+token, Accept:'application/vnd.github+json', 'Content-Type':'application/json' },
+      body: JSON.stringify(body)
+    });
+    if(!res.ok){
+      const t = await res.text();
+      throw new Error('Publish failed (' + res.status + '). ' + t.slice(0,140));
+    }
+    setStatus('Published. The live site picks it up within about a minute.', true);
+  }catch(e){ setStatus(e.message, false); }
+};
+
+setInterval(()=>{ if(document.querySelector('#queueList .item')) renderQueue(); }, 1000);
+
+document.getElementById('btnReload').onclick = async () => {
+  try{
+    const j = await fetchData();
+    if(!j) throw new Error('Could not load data.json. Fill in your repo below, then try again.');
+    if(!Array.isArray(j.queue)) throw new Error('That data.json has no queue array.');
+    DATA = j; save();
+    setIntervalFields();
+    renderSocial();
+    renderQueue(); renderPacks(); clearForm();
+    setStatus('Loaded the live queue.', true);
+  }catch(e){ setStatus(e.message, false); }
+};
+
+/* ---------- boot ---------- */
+(async function(){
+  const cached = localStorage.getItem(LS);
+  if(cached){
+    try{ DATA = JSON.parse(cached); }catch(e){}
+  }
+  if(!DATA.queue.length){
+    const j = await fetchData();
+    if(j && Array.isArray(j.queue)) DATA = j;
+  }
+  if(DATA.skins) Object.assign(SKINS, DATA.skins);
+  setIntervalFields();
+  renderSocial();
+  renderSkinPicker();
+  renderPacks();
+  renderQueue();
+  clearForm();
+})();
+</script>
+</body>
+</html>
